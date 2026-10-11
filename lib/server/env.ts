@@ -5,7 +5,7 @@ const serverEnvSchema = z.object({
   SYNCCENTRIC_API_TOKEN: z.string().min(1),
   SYNCCENTRIC_LOCALE: z.string().min(2).default('US'),
   GAS_LEDGER_URL: z.url().startsWith('https://script.google.com/'),
-  GAS_LEDGER_SECRET: z.string().min(16),
+  GAS_LEDGER_SECRET: z.string().min(12),
   NOTION_TOKEN: z.string().min(1),
   NOTION_DATABASE_ID: z.string().optional(),
   NOTION_DATA_SOURCE_ID: z.string().optional(),
@@ -32,10 +32,18 @@ export function requireEnv<K extends Key>(...keys: K[]): Pick<ServerEnv, K> {
 }
 
 export function integrationStatus() {
+  const valid = (...keys: Key[]) => {
+    try {
+      requireEnv(...keys)
+      return true
+    } catch {
+      return false
+    }
+  }
   const has = (k: string) => Boolean(process.env[k]?.trim())
   return {
-    synccentric: has('SYNCCENTRIC_API_TOKEN'),
-    ledger: has('GAS_LEDGER_URL') && has('GAS_LEDGER_SECRET'),
-    notion: has('NOTION_TOKEN') && (has('NOTION_DATABASE_ID') || has('NOTION_DATA_SOURCE_ID')),
+    synccentric: valid('SYNCCENTRIC_API_TOKEN', 'SYNCCENTRIC_LOCALE'),
+    ledger: valid('GAS_LEDGER_URL', 'GAS_LEDGER_SECRET'),
+    notion: valid('NOTION_TOKEN') && (has('NOTION_DATABASE_ID') || has('NOTION_DATA_SOURCE_ID')),
   }
 }
