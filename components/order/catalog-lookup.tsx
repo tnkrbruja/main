@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
-import { Search } from 'lucide-react'
+import { ScanBarcode, Search } from 'lucide-react'
+import { useBarcodeScanner } from '@/hooks/use-barcode-scanner'
+import { detectIdentifierType } from '@/lib/orders/barcode'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,12 +38,29 @@ export function CatalogLookup({ selected, onSelect }: Props) {
     shouldRetryOnError: false,
   })
 
-  function runLookup() {
-    const trimmed = identifier.trim()
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  function runLookup(value = identifier, lookupType = type) {
+    const trimmed = value.trim()
     if (trimmed.length < 2) return
     onSelect(null)
-    setQuery({ identifier: trimmed, type })
+    setQuery({ identifier: trimmed, type: lookupType })
   }
+
+  useBarcodeScanner({
+    scanTarget: inputRef,
+    onScan: (code) => {
+      const detected = detectIdentifierType(code) ?? (type === 'keyword' ? 'upc' : type)
+      setIdentifier(code)
+      setType(detected)
+      runLookup(code, detected)
+      inputRef.current?.focus()
+    },
+  })
 
   return (
     <fieldset className="flex flex-col gap-4">
@@ -65,7 +84,9 @@ export function CatalogLookup({ selected, onSelect }: Props) {
         <div className="flex flex-1 flex-col gap-2">
           <Label htmlFor="identifier">{TYPE_LABELS[type]}</Label>
           <Input
+            ref={inputRef}
             id="identifier"
+            aria-describedby="identifier-hint"
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
             onKeyDown={(e) => {
@@ -78,11 +99,15 @@ export function CatalogLookup({ selected, onSelect }: Props) {
             maxLength={120}
           />
         </div>
-        <Button type="button" onClick={runLookup} disabled={isLoading || identifier.trim().length < 2}>
+        <Button type="button" onClick={() => runLookup()} disabled={isLoading || identifier.trim().length < 2}>
           {isLoading ? <Spinner /> : <Search aria-hidden="true" />}
           Look up
         </Button>
       </div>
+      <p id="identifier-hint" className="flex items-center gap-2 text-sm text-muted-foreground">
+        <ScanBarcode aria-hidden="true" className="size-4" />
+        Scanner ready: scan a barcode anytime and the lookup runs automatically.
+      </p>
 
       <div aria-live="polite" className="flex flex-col gap-3">
         {error && <p className="text-sm text-destructive">{error.message}</p>}
